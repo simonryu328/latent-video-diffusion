@@ -10,6 +10,8 @@ import jax
 import equinox as eqx
 import numpy as np
 import jax.numpy as jnp
+from collections import deque
+import re
 
 
 def ckpt_path(ckpt_dir,iteration, ckpt_type):
@@ -178,3 +180,98 @@ def encode_frames(args, cfg):
         with open(output_path, 'wb') as f:
             pickle.dump(latents, f)
 
+"""
+    Checkpoint Related Utilities
+
+    A checkpoint state is defined as the following : 
+        [ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, ckpts_list]
+
+        ckpt_type : Type of checkpoint. eg: vae, dl etc
+        ckpt_dir : Directory where checkpoint files are saved.
+        max_ckpts : Maximum number of checkpoints allowed associated with an id. Set in config
+        ckpt_interval : Interval after which checkpoint is updated. set in Interval. 
+        ckpt_list : List of saved checkpoint paths in sorted order (oldest -> newest). 
+"""
+
+
+def create_checkpoint_state(ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, *args):
+    """
+    Returns checkpoint state. Checks if chkpt path exists. 
+    """
+
+    if not os.path.exists(ckpt_dir):
+        os.makedirs(ckpt_dir)
+    else :        
+        ckpt_list = [ckpt_file for ckpt_file in os.listdir(ckpt_dir) if (ckpt_type in ckpt_file)]
+        if len(ckpt_list) !=0:
+            print(f"Warning : The checkpoint directory {ckpt_dir} already has checkpoints of type {ckpt_type} in it. These may be deleted.")
+            print(f"\n\nPress any key to continue...")
+            input()
+
+    return [ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, []]
+
+def update_checkpoint_state(state, ckpt_state):
+
+    iteration = state[3]
+    ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, ckpt_list = ckpt_state
+
+    # Update checkpoints at interval 
+    if (iteration % ckpt_interval) == (ckpt_interval - 1):
+
+        chkpt_queue = deque(ckpt_list)
+        
+        # Save new checkpoint
+
+        chkpt_path  = _create_ckpt_path(ckpt_dir, iteration, ckpt_type) 
+        
+        with open(chkpt_path, 'wb') as f:
+            dill.dump(state, f) # 
+        
+        chkpt_queue.append(chkpt_path)
+        
+        print("---------CHECKPOINT SAVED----------")
+
+        # Clean checkpoints 
+        while (len(chkpt_queue) > max_ckpts):
+                delete_path = chkpt_queue.popleft()
+                os.remove(delete_path)
+                print(f"File '{delete_path}' deleted")
+        ckpt_list = list(chkpt_queue)
+    
+    return [ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, ckpt_list]
+
+def load_checkpoint_state(filepath, max_ckpts, ckpt_interval, ckpt_type, *args):
+    """
+        Loads state for filepath. 
+        Create checkpoint state based on file-path and given criterion.
+        
+        NOTE : Adds list of existing checkpoints of same type in directory. These checkpoints will be deleted in update_checkpoint
+                if the total number of checkpoints exceeds maximum checkpoints. 
+    """
+
+    state = _load_checkpoint(filepath)
+
+    ckpt_dir = os.path.dirname(filepath)
+
+    ckpt_list = [ckpt_file for ckpt_file in os.listdir(ckpt_dir) if (ckpt_type in ckpt_file)]
+
+    ckpt_list_sorted = sorted(ckpt_list, key=lambda s: int(re.search(r'\d+', s).group()))
+
+    ckpt_state = [ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, ckpt_list_sorted]
+    return state, ckpt_state
+    
+
+
+def _create_ckpt_path(ckpt_dir,iteration, ckpt_type):
+    filename = f'checkpoint_{ckpt_type}_{iteration}.pkl'
+    ckpt_path = os.path.join(ckpt_dir, filename)
+    return ckpt_path 
+
+
+def _load_checkpoint(filepath):
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"File '{filepath}' does not exist.")
+
+    with open(filepath, 'rb') as f:
+        state = pickle.load(f)
+    return state
