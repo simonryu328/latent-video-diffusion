@@ -1,5 +1,6 @@
 import os
 import cv2
+import numpy as np
 
 def resize_video(input_path, output_path, target_resolution=(512, 300)):
     # Open video file
@@ -38,13 +39,18 @@ def process_videos(input_directory, output_directory):
     for filename in os.listdir(input_directory):
         if filename.endswith((".mp4", ".avi", ".mkv")):
             input_path = os.path.join(input_directory, filename)
-            output_path = os.path.join(output_directory, filename)
+            if np.random.random() >= 0.8:
+                output_path = os.path.join(output_directory, "validation_resize", filename)
+            else: 
+                output_path = os.path.join(output_directory, "training_resize", filename)
             
             # Resize the video
             resize_video(input_path, output_path)
 
 if __name__ == "__main__":
-    input_directory = "../../data/"
-    output_directory = "../../data/training_resize"
-    
+    # input_directory = "/dev/shm/data/downloads"
+    # output_directory = "/dev/shm/data/"
+    input_directory = "../../data/downloads"
+    output_directory = "../../data"
+    print("Resizing Videos")
     process_videos(input_directory, output_directory)

@@ -6,18 +6,24 @@ import os
 class FrameExtractor:
     def __init__(self, directory_path, batch_size, key, target_size=(512,300)):
         self.directory_path = directory_path
-        self.video_files = [f for f in os.listdir(directory_path) if f.endswith(('.mp4', '.avi'))] # Adjust as needed
+        self.video_files = [f for f in os.listdir(directory_path) if f.endswith(('.mp4', '.avi', '.npy'))] # Adjust as needed
         self.batch_size = batch_size
         self.key = key
         self.video_gbl_idxs = np.zeros(len(self.video_files)) #holds global idx value for every video 
         self.total_frames = 0
         i = 0
+
+        
         for f in self.video_files:
-            frame_count = int(cv2.VideoCapture(os.path.join(directory_path, f)).get(cv2.CAP_PROP_FRAME_COUNT))
+            if f.endswith('.npy'):
+                frame_count = int(np.shape(np.load(os.path.join(directory_path, f)))[0])
+            else:
+                frame_count = int(cv2.VideoCapture(os.path.join(directory_path, f)).get(cv2.CAP_PROP_FRAME_COUNT))
             self.total_frames += frame_count
             self.video_gbl_idxs[i] = self.total_frames
             i += 1
         self.cap = None
+        self.vid_arr = None
         self.target_size = target_size
 
     def __enter__(self):
@@ -45,14 +51,22 @@ class FrameExtractor:
                 video_idx = np.searchsorted(self.video_gbl_idxs, int(global_idx))
                 local_idx = int(global_idx) - int(self.video_gbl_idxs[video_idx-1])
             # print("frame", local_idx)
-            # print("video", video_idx) 
-            self.cap = cv2.VideoCapture(os.path.join(self.directory_path, self.video_files[video_idx]))
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, local_idx)
-            ret, frame = self.cap.read()
-            self.cap.release()
-
-            if ret:
+            # print("video", video_idx)
+            vid_pth = self.video_files[video_idx]
+            #Selecting frame for numpy files
+            if vid_pth.endswith('.npy'):
+                self.vid_arr = np.load(os.path.join(self.directory_path, vid_pth))
+                frame = self.vid_arr[local_idx - 1]
                 frames.append(frame)
+            #Selecting frame for video files
+            else:
+                self.cap = cv2.VideoCapture(os.path.join(self.directory_path, vid_pth))
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, local_idx)
+                ret, frame = self.cap.read()
+                self.cap.release()
+
+                if ret:
+                    frames.append(frame)
 
         array = jax.numpy.array(frames)
         return array.transpose(0,3,2,1)

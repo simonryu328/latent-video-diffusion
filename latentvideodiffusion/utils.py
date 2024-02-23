@@ -240,7 +240,7 @@ def update_checkpoint_state(state, ckpt_state):
     
     return [ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, ckpt_list]
 
-def load_checkpoint_state(filepath, max_ckpts, ckpt_interval, ckpt_type, *args):
+def load_checkpoint_state(filepath, max_ckpts, ckpt_interval, ckpt_type, ckpt_dir):
     """
         Loads state for filepath. 
         Create checkpoint state based on file-path and given criterion.
@@ -251,7 +251,7 @@ def load_checkpoint_state(filepath, max_ckpts, ckpt_interval, ckpt_type, *args):
 
     state = _load_checkpoint(filepath)
 
-    ckpt_dir = os.path.dirname(filepath)
+    # ckpt_dir = os.path.dirname(filepath)
 
     ckpt_list = [ckpt_file for ckpt_file in os.listdir(ckpt_dir) if (ckpt_type in ckpt_file)]
 
