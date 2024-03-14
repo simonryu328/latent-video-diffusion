@@ -1,5 +1,7 @@
 import cv2
 import jax
+from jax import jit
+import timeit
 import numpy as np
 import os
 
@@ -25,6 +27,8 @@ class FrameExtractor:
         self.vid_arr = None
         self.target_size = target_size
         # self.preload_data()
+        self.split_jit = jax.jit(jax.random.split)
+        self.randomint_jit = jax.jit(jax.random.randint,static_argnames=['shape'])
 
     def __enter__(self):
         return self
@@ -37,8 +41,10 @@ class FrameExtractor:
         return self
 
     def __next__(self):
-        self.key, idx_key = jax.random.split(self.key)
-        idx_array = jax.random.randint(idx_key, (self.batch_size,), 0, self.total_frames)
+        
+
+        self.key, idx_key = self.split_jit(self.key)
+        idx_array = self.randomint_jit(idx_key, (self.batch_size,), 0, self.total_frames)
         local_idx = 0
         video_idx = 0
         frames = []
@@ -69,7 +75,7 @@ class FrameExtractor:
 
                 if ret:
                     frames.append(frame)
-
+       
         array = jax.numpy.array(frames)
         return array.transpose(0,3,2,1)
     
@@ -114,3 +120,34 @@ def extract_frames(video_path, num_frames, key, target_size=(512, 300)):
     cap.release()
 
     return jax.numpy.array(frames).transpose(0, 3, 2, 1)
+
+
+
+
+def test_frame_extractor(directory_path, batch_size, key_seed):
+    key = jax.random.PRNGKey(key_seed)
+    
+    
+    times = []
+    with FrameExtractor(directory_path, batch_size, key) as extractor:
+        # Iterate over the frame extractor and display the frames
+        overhead_start = timeit.default_timer()
+        overhead_end = timeit.default_timer() - overhead_start
+        print("Overhead time of  ", overhead_end)
+
+        for i in range(20):
+            start_time = timeit.default_timer()
+            extractor.__next__().block_until_ready()
+            end_time = timeit.default_timer() - start_time
+            print(f"Iteration {i} : Time {end_time}\n")
+            times.append(round(end_time,3))
+    print("Min time of ", min(times))
+
+# def main() -> None:
+#     directory_path = "/mnt/disks/persist/vidmod/data/training_resize"
+#     batch_size = 120
+#     key_seed = 800 
+#     test_frame_extractor(directory_path, batch_size, key_seed)  
+
+# if __name__ == '__main__' : 
+#     main()
