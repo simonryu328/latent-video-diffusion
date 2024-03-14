@@ -43,19 +43,20 @@ class VAEEncoder(eqx.Module):
     mean_output: eqx.nn.Linear 
     log_var_output: eqx.nn.Linear
     def __init__(self, n_latent, input_size, k, key):
-        keys = jax.random.split(key, 13) 
+        keys = jax.random.split(key, 13)
+        kernel = (2,2)
         self.conv_layers = [
-            eqx.nn.Conv(num_spatial_dims=2, in_channels=3, out_channels=8*k, kernel_size=(2,2), stride=2,key=keys[0]),
+            eqx.nn.Conv(num_spatial_dims=2, in_channels=3, out_channels=8*k, kernel_size=kernel, stride=2,key=keys[0]),
             ConvResBlock(8*k,256,150, key=keys[1]),
-            eqx.nn.Conv(num_spatial_dims=2, in_channels=8*k, out_channels=16*k, kernel_size=(2,2), stride=2,key=keys[2], padding=[(0,0),(1,1)]),
+            eqx.nn.Conv(num_spatial_dims=2, in_channels=8*k, out_channels=16*k, kernel_size=kernel, stride=2,key=keys[2], padding=[(0,0),(1,1)]),
             ConvResBlock(16*k,128,76,key=keys[3]),
-            eqx.nn.Conv(num_spatial_dims=2, in_channels=16*k, out_channels=32*k, kernel_size=(2,2), stride=2,key=keys[4]),
+            eqx.nn.Conv(num_spatial_dims=2, in_channels=16*k, out_channels=32*k, kernel_size=kernel, stride=2,key=keys[4]),
             ConvResBlock(32*k,64,38,key=keys[5]),
-            eqx.nn.Conv(num_spatial_dims=2, in_channels=32*k, out_channels=64*k, kernel_size=(2,2), stride=2,key=keys[6], padding=[(0,0),(1,1)]),
+            eqx.nn.Conv(num_spatial_dims=2, in_channels=32*k, out_channels=64*k, kernel_size=kernel, stride=2,key=keys[6], padding=[(0,0),(1,1)]),
             ConvResBlock(64*k,32,20,key=keys[7]),
-            eqx.nn.Conv(num_spatial_dims=2, in_channels=64*k, out_channels=128*k, kernel_size=(2,2), stride=2,key=keys[8]),
+            eqx.nn.Conv(num_spatial_dims=2, in_channels=64*k, out_channels=128*k, kernel_size=kernel, stride=2,key=keys[8]),
             ConvResBlock(128*k,16,10,key=keys[8]),
-            eqx.nn.Conv(num_spatial_dims=2, in_channels=128*k, out_channels=256*k, kernel_size=(2,2), stride=2,key=keys[9]),
+            eqx.nn.Conv(num_spatial_dims=2, in_channels=128*k, out_channels=256*k, kernel_size=kernel, stride=2,key=keys[9]),
             ConvResBlock(256*k,8,5, key=keys[10])
         ]
         self.mean_output = eqx.nn.Linear(10240*k, n_latent, key=keys[11]) #10240 (original value)

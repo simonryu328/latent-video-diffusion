@@ -50,7 +50,7 @@ def process_videos(input_directory, output_directory):
 if __name__ == "__main__":
     # input_directory = "/dev/shm/data/downloads"
     # output_directory = "/dev/shm/data/"
-    input_directory = "../../data/downloads"
-    output_directory = "../../data"
+    input_directory = "../../generation/dowload"
+    output_directory = "../../generation/og_vid"
     print("Resizing Videos")
     process_videos(input_directory, output_directory)

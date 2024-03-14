@@ -212,6 +212,11 @@ def train(args, cfg):
                     #loop_time = time.time()
                     train_data = jnp.array(next(train_fe), dtype=jnp.float32)
                     val_data = jnp.array(next(val_fe), dtype=jnp.float32)
+
+                    #dummy data
+                    # train_data = jnp.zeros((batch_size, 3, 512,300), dtype=jnp.float32)
+                    # val_data = jnp.zeros((batch_size, 3, 512,300), dtype=jnp.float32)
+                    
                     #print("Processed input data in ", time.time()-loop_time, " seconds")
                     #loop_time = time.time()
                     # Update state
@@ -221,7 +226,7 @@ def train(args, cfg):
                     # Print or log training and validation losses
                     #print(f"Training Loss: {train_loss}, Validation Loss: {val_loss}")
 
-                    # Save metrics to file
+                    # # Save metrics to file
                     f.write(f"{train_loss}\t{val_loss}\n")
                     f.flush()
                     checkpoint_state = utils.update_checkpoint_state(state, checkpoint_state)

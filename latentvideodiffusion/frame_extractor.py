@@ -13,7 +13,6 @@ class FrameExtractor:
         self.total_frames = 0
         i = 0
 
-        
         for f in self.video_files:
             if f.endswith('.npy'):
                 frame_count = int(np.shape(np.load(os.path.join(directory_path, f)))[0])
@@ -25,6 +24,7 @@ class FrameExtractor:
         self.cap = None
         self.vid_arr = None
         self.target_size = target_size
+        # self.preload_data()
 
     def __enter__(self):
         return self
@@ -53,6 +53,8 @@ class FrameExtractor:
             # print("frame", local_idx)
             # print("video", video_idx)
             vid_pth = self.video_files[video_idx]
+            # frame = self.preloaded_data[vid_pth][local_idx]
+            # frames.append(frame)
             #Selecting frame for numpy files
             if vid_pth.endswith('.npy'):
                 self.vid_arr = np.load(os.path.join(self.directory_path, vid_pth))
@@ -70,6 +72,26 @@ class FrameExtractor:
 
         array = jax.numpy.array(frames)
         return array.transpose(0,3,2,1)
+    
+    def preload_data(self):
+        self.preloaded_data = {}
+        self.i = 1
+        for vid_pth in self.video_files:
+            full_path = os.path.join(self.directory_path, vid_pth)
+            if vid_pth.endswith('.npy'):
+                self.preloaded_data[vid_pth] = np.load(full_path)
+            else:
+                cap = cv2.VideoCapture(full_path)
+                frames = []
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    frames.append(frame)
+                cap.release()
+                print("Loaded {} Video", self.i)
+                self.i += 1
+                self.preloaded_data[vid_pth] = frames
     
 
 def extract_frames(video_path, num_frames, key, target_size=(512, 300)):

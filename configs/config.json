@@ -1,7 +1,7 @@
 {
   "seed": 42,
   "lvm": {
-    "n_latent": 4096
+    "n_latent": 512
   },
   "transcode": {
     "bs": 32, 
@@ -14,18 +14,18 @@
     },
     "reconstruct": {
       "n_sample": 8,
-      "video_file": "../../data/training_resize/Gaming_1080P-7a1e_crf_10_ss_00_t_20.0.mp4",
+      "video_file": "../../generation/og_vid/training_resize/Gaming_1080P-7a1e_crf_10_ss_00_t_20.0.mp4",
       "generation_path": "../../generation"
     },
     "train": {
       "ckpt_dir": "../../checkpoints",
-      "lr": 0.00005,
-      "ckpt_interval": 5001,
-      "max_ckpts" : 3,
-      "data_dir_train": "../../data/training_resize",
-      "data_dir_val": "../../data/validation_resize",
+      "lr": 0.0001,
+      "ckpt_interval": 15000,
+      "max_ckpts" : 9,
+      "data_dir_train": "/mnt/disks/persist/vidmod/data/training_resize",
+      "data_dir_val": "/mnt/disks/persist/vidmod/data/validation_resize",
       "bs": 128,
-      "metrics_path": "../../logs/loss_vae_4096_qtr_lr__beforeglitch.txt",
+      "metrics_path": "../../logs/loss_vae_512.txt",
       "clip_norm": 10,
       "kl_alpha": 0.8
     }
