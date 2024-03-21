@@ -147,7 +147,6 @@ def encode_frames(args, cfg):
             ret, frame = cap.read()
             if not ret:
                 break
-            frame = cv2.resize(frame, cfg["transcode"]["target_size"])
             original_frames.append(frame)
 
             if len(original_frames) == cfg["transcode"]["bs"]:

@@ -126,6 +126,7 @@ def sample(args, cfg):
     print("Entered Sample Function")
     n_samples = cfg["dt"]["sample"]["n_sample"]
     n_steps = cfg["dt"]["sample"]["n_steps"]
+    generation_path = cfg["dt"]["sample"]["generation_path"]
     n_latent = cfg["lvm"]["n_latent"]
     l_x = cfg["dt"]["l_x"]
     l_y = cfg["dt"]["l_y"]
@@ -147,16 +148,20 @@ def sample(args, cfg):
 
     with latent_dataset.LatentDataset(data_directory=args.data_dir, 
         batch_size=n_samples, prompt_length=l_x, completion_length=l_y) as ld:
+
         prompt_samples, completion_samples = sample_datapoint(next(ld), data_key)
     print("a")
     latent_continuations = sample_diffusion(prompt_samples, trained_dt, f_neg_gamma, dt_sample_key, n_steps, completion_samples.shape[1:])
     print("b")
     continuation_frames = vae.sample_gaussian(m_decoder(latent_continuations), decode_sample_key)
     print(continuation_frames.shape)
-    
+    i = 0
     for sample in continuation_frames:
+
         print(str(sample.shape) + "Generated Sample Shape")
-        utils.show_samples(sample, args.name)
+        name = args.name
+        utils.show_samples(sample, generation_path ,name)
+        i += 1
 
 def train(args, cfg):
     key = jax.random.PRNGKey(cfg["seed"])

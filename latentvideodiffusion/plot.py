@@ -9,9 +9,9 @@ def plot_loss(args, cfg):
         metrics_path = cfg["dt"]["train"]["metrics_path"]
     else:
         print("Invalid type specified")
-    plot_data_and_filtered(metrics_path, cfg)
+    plot_data_and_filtered(args, metrics_path, cfg)
 #TODO add table settings for DT
-def plot_data_and_filtered(file_path, cfg):
+def plot_data_and_filtered(args, file_path, cfg):
     # Read the data from the file
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -39,15 +39,34 @@ def plot_data_and_filtered(file_path, cfg):
     plt.xlabel('Iteration')
     plt.ylabel('Loss (nats/dim)')
 
-    cellText = [["Run", file_path[5:-4]],
-                ["BatchSize", str(cfg["vae"]["train"]["bs"])],
-                ["Learning Rate", str(cfg["vae"]["train"]["lr"])],
-                ["KL Factor", str(cfg["vae"]["train"]["kl_alpha"])],
-                ["Size Multiplier",str(cfg["vae"]["size_multiplier"])],
-                ["Clip Norm", str(cfg["vae"]["train"]["clip_norm"])],
-                ["N Latent",str(cfg["lvm"]["n_latent"])],
-                ["Training Loss", str(round(y_train[-1], 5))],
-                ["Valiation Loss", str(round(y_val[-1], 5))]]
+    if args.type == "vae":
+        cellText = [["Run", file_path[5:-4]],
+                    ["BatchSize", str(cfg["vae"]["train"]["bs"])],
+                    ["Learning Rate", str(cfg["vae"]["train"]["lr"])],
+                    ["KL Factor", str(cfg["vae"]["train"]["kl_alpha"])],
+                    ["Size Multiplier",str(cfg["vae"]["size_multiplier"])],
+                    ["Clip Norm", str(cfg["vae"]["train"]["clip_norm"])],
+                    ["N Latent",str(cfg["lvm"]["n_latent"])],
+                    ["Training Loss", str(round(y_train[-1], 5))],
+                    ["Valiation Loss", str(round(y_val[-1], 5))]]
+    if args.type == "dt":
+        cellText = [["Run", file_path[5:-4]],
+                    ["BatchSize", str(cfg["dt"]["train"]["bs"])],
+                    ["Learning Rate", str(cfg["dt"]["train"]["lr"])],
+                    ["Clip Norm", str(cfg["dt"]["train"]["clip_norm"])],
+                    ["N Latent",str(cfg["lvm"]["n_latent"])],
+                    ["VAE Checkpoint", str(cfg["dt"]["train"]["vae_checkpoint"])],
+                    ["N Layers", str(cfg["dt"]["n_layers"])], 
+                    ["d_l", str(cfg["dt"]["d_l"])], 
+                    ["d_mlp", str(cfg["dt"]["d_mlp"])], 
+                    ["n_q", str(cfg["dt"]["n_q"])], 
+                    ["d_qk", str(cfg["dt"]["d_qk"])],
+                    ["d_dv", str(cfg["dt"]["d_qk"])],
+                    ["l_x", str(cfg["dt"]["l_x"])],
+                    ["l_y", str(cfg["dt"]["l_y"])],
+                    ["Training Loss", str(round(y_train[-1], 5))],
+                    ["Valiation Loss", str(round(y_val[-1], 5))]]
+        
     table = plt.table(cellText=cellText, cellLoc="left", bbox=[1,0, 0.2, 1])
     plt.grid(True)
     plt.legend(loc='upper right')

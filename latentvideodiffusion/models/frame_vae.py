@@ -7,6 +7,7 @@ class ConvResBlock(eqx.Module):
     inp_layer: eqx.nn.Conv
     outp_layer: eqx.nn.Conv
     layer_norm: eqx.nn.LayerNorm
+    # channel_norm: eqx.nn.GroupNorm
     def __init__(self, n_latent, h, w, key):
         a,b = jax.random.split(key, 2) 
         padding = [(1,1),(1,1)]
@@ -14,6 +15,7 @@ class ConvResBlock(eqx.Module):
         self.inp_layer = eqx.nn.Conv(num_spatial_dims=2, in_channels=n_latent, out_channels=n_latent*2, kernel_size=(3,3), stride=1,padding=padding,key=a)
         self.outp_layer = eqx.nn.Conv(num_spatial_dims=2, in_channels=n_latent*2, out_channels=n_latent, kernel_size=(3,3), stride=1,padding=padding,key=b)
         self.layer_norm = eqx.nn.LayerNorm(shape=shape, use_bias=False, use_weight=False) #how can the shape be calculated? #this can't be pickled...why?
+        # self.channel_norm = eqx.nn.GroupNorm(groups=n_latent, channelwise_affine=False)
         
         
     def __call__(self, x):
@@ -23,6 +25,7 @@ class ConvResBlock(eqx.Module):
         d = c + x
         y = self.layer_norm(d) #ValueError: `LayerNorm(shape)(x)` must satisfy the invariant `shape == x.shape`Received `shape=(8,) and `x.shape=(8, 256, 150)`
                                #You might need to replace `layer_norm(x)` with `jax.vmap(layer_norm)(x)`.
+        # y = self.channel_norm(d)
         return y
 
     # def __getstate__(self):
