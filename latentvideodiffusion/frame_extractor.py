@@ -6,11 +6,11 @@ import numpy as np
 import os
 
 class FrameExtractor:
-    def __init__(self, directory_path, batch_size, key, target_size=(512,300)):
+    def __init__(self, directory_path, batch_size, target_size=(512,300)):
         self.directory_path = directory_path
         self.video_files = [f for f in os.listdir(directory_path) if f.endswith(('.mp4', '.avi', '.npy'))] # Adjust as needed
         self.batch_size = batch_size
-        self.key = key
+        # self.key = key
         self.video_gbl_idxs = np.zeros(len(self.video_files)) #holds global idx value for every video 
         self.total_frames = 0
         i = 0
@@ -27,8 +27,8 @@ class FrameExtractor:
         self.vid_arr = None
         self.target_size = target_size
         # self.preload_data()
-        self.split_jit = jax.jit(jax.random.split)
-        self.randomint_jit = jax.jit(jax.random.randint,static_argnames=['shape'])
+        # self.split_jit = jax.jit(jax.random.split)
+        # self.randomint_jit = jax.jit(jax.random.randint,static_argnames=['shape'])
 
     def __enter__(self):
         return self
@@ -43,8 +43,10 @@ class FrameExtractor:
     def __next__(self):
         
 
-        self.key, idx_key = self.split_jit(self.key)
-        idx_array = self.randomint_jit(idx_key, (self.batch_size,), 0, self.total_frames)
+        # self.key, idx_key = self.split_jit(self.key)
+        # idx_array = self.randomint_jit(idx_key, (self.batch_size,), 0, self.total_frames)
+        idx_array = np.random.randint(0, self.total_frames + 1, size=self.batch_size)
+
         local_idx = 0
         video_idx = 0
         frames = []
@@ -76,7 +78,8 @@ class FrameExtractor:
                 if ret:
                     frames.append(frame)
        
-        array = jax.numpy.array(frames)
+        array = np.array(frames)
+        # return array
         return array.transpose(0,3,2,1)
     
     def preload_data(self):

@@ -204,8 +204,8 @@ def create_checkpoint_state(ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, *args
         ckpt_list = [ckpt_file for ckpt_file in os.listdir(ckpt_dir) if (ckpt_type in ckpt_file)]
         if len(ckpt_list) !=0:
             print(f"Warning : The checkpoint directory {ckpt_dir} already has checkpoints of type {ckpt_type} in it. These may be deleted.")
-            print(f"\n\nPress any key to continue...")
-            input()
+            # print(f"\n\nPress any key to continue...")
+            # input()
 
     return [ckpt_type, ckpt_dir, max_ckpts, ckpt_interval, []]
 

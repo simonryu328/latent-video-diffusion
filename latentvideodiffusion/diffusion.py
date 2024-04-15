@@ -159,7 +159,7 @@ def sample(args, cfg):
     for sample in continuation_frames:
 
         print(str(sample.shape) + "Generated Sample Shape")
-        name = args.name
+        name = args.name + str(i)
         utils.show_samples(sample, generation_path ,name)
         i += 1
 

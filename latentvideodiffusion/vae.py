@@ -11,6 +11,10 @@ from jax.sharding import PositionalSharding
 from jax.sharding import PartitionSpec as P
 import optax
 
+import multiprocessing as mp
+import numpy as np
+import time
+
 # import latentvideodiffusion as lvd
 # import latentvideodiffusion.models.frame_vae as frame_vae
 # import latentvideodiffusion.frame_extractor as fe
@@ -19,9 +23,10 @@ import optax
 from . import utils, frame_extractor as fe, frame_transcode as ft
 from .models import frame_vae 
 
-import time
+# import utils, frame_extractor as fe
+# from models import frame_vae
 
-kl_a = 0.8 #TODO fix loading of this value
+kl_a = 0.0001 #TODO fix loading of this value
 
 #Gaussian VAE primitives
 def gaussian_kl_divergence(p, q):
@@ -166,17 +171,35 @@ def reconstruct(args, cfg):
     samples = reconstruct_vae(n_samples, video_path, trained_vae, key)
     utils.show_samples(samples, generation_path ,args.name)
 
-def train(args, cfg):
+def data_loader(queue, frame_extractor):
+    print('Producer: Running', flush=True)
+    # generate work
+    try:
+        while True:
+            # generate a value
+            # _, key = jax.random.split(key)
+            data = next(frame_extractor)
+            # block
+            # time.sleep(1)
+            # add to the queue
+            queue.put(data)
+        # all done
+        queue.put(None)
+        print('Producer: Done', flush=True)
+    except KeyboardInterrupt:
+        print("Producer received KeyboardInterrupt, terminating...")
+
+# consume work
+def update_model(args, cfg, train_queue, val_queue):
+    print('Consumer: Running', flush=True)
     print("Entered VAE Training Function")
     ckpt_dir = cfg["vae"]["train"]["ckpt_dir"]
     lr = cfg["vae"]["train"]["lr"]
     ckpt_interval = cfg["vae"]["train"]["ckpt_interval"]
-    video_paths_train = cfg["vae"]["train"]["data_dir_train"]
-    video_paths_val = cfg["vae"]["train"]["data_dir_val"]
-    batch_size = cfg["vae"]["train"]["bs"]
     clip_norm = cfg["vae"]["train"]["clip_norm"]
     metrics_path = cfg["vae"]["train"]["metrics_path"]
     kl_a = cfg["vae"]["train"]["kl_alpha"]
+
     adam_optimizer = optax.adam(lr)
     optimizer = optax.chain(adam_optimizer, optax.zero_nans(), optax.clip_by_global_norm(clip_norm))
     
@@ -198,96 +221,70 @@ def train(args, cfg):
     else:
         checkpoint_path = args.checkpoint
         state, checkpoint_state = utils.load_checkpoint_state(checkpoint_path, **ckpt_params)
-    
+    print("Created VAE")
+
     dir_name = os.path.dirname(metrics_path)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
-    ################### ORIGINAL TRAINING LOOP #####################
-    with open(metrics_path,"a") as f:
-        #TODO: Fix Frame extractor rng
-        with fe.FrameExtractor(video_paths_train, batch_size, state[2]) as train_fe:
-            with fe.FrameExtractor(video_paths_val, batch_size, state[2]) as val_fe:
-                for _ in utils.tqdm_inf():
-                    # Process input data
-                    #loop_time = time.time()
-                    train_data = jnp.array(next(train_fe), dtype=jnp.float32)
-                    val_data = jnp.array(next(val_fe), dtype=jnp.float32)
 
-                    #dummy data
-                    # train_data = jnp.zeros((batch_size, 3, 512,300), dtype=jnp.float32)
-                    # val_data = jnp.zeros((batch_size, 3, 512,300), dtype=jnp.float32)
-                    
-                    #print("Processed input data in ", time.time()-loop_time, " seconds")
-                    #loop_time = time.time()
-                    # Update state
-                    val_loss, _ = utils.update_state(state, val_data, optimizer, vae_loss)
-                    train_loss, state = utils.update_state(state, train_data, optimizer, vae_loss)
-                    #print("Updated state in ", time.time()-loop_time, " seconds")
-                    # Print or log training and validation losses
-                    #print(f"Training Loss: {train_loss}, Validation Loss: {val_loss}")
+    start_time = time.time()
+    for _ in utils.tqdm_inf():
+        with open(metrics_path, "a") as f:
+            train_data = train_queue.get()
+            val_data = val_queue.get()
+            # check for stop
+            if train_data is None or val_data is None:
+                break
 
-                    # # Save metrics to file
-                    f.write(f"{train_loss}\t{val_loss}\n")
-                    f.flush()
-                    checkpoint_state = utils.update_checkpoint_state(state, checkpoint_state)
+            try:
+                train_data = jnp.array(train_data)
+                val_data = jnp.array(val_data)
+                train_loss, state = utils.update_state(state, train_data, optimizer, vae_loss)
+                val_loss, _ = utils.update_state(state, val_data, optimizer, vae_loss)
+                checkpoint_state = utils.update_checkpoint_state(state, checkpoint_state)
 
-    # ################ REVISED TRAINING LOOP WITH DATA PARALLELISM ###############
+                current_time = time.time() - start_time
+                f.write(f"{train_loss}\t{val_loss}\n")
+                f.flush()
+            except Exception as e:
+                print(e)
+  
+def train(args, cfg):
+    video_paths_train = cfg["vae"]["train"]["data_dir_train"]
+    video_paths_val = cfg["vae"]["train"]["data_dir_val"]
+    batch_size = cfg["vae"]["train"]["bs"]
+    train_extractor = fe.FrameExtractor(video_paths_train, batch_size)
+    val_extractor = fe.FrameExtractor(video_paths_val, batch_size)
 
-    # # Checking the number of devices we have here
-    # num_devices = len(jax.local_devices())
-    # print(f"Running on {num_devices} devices")
+    mp_ctx = mp.get_context('fork')
+    try:
+        train_queue = mp_ctx.Queue()
+        val_queue = mp_ctx.Queue()
 
-    # # Get the device array
-    # devices = mesh_utils.create_device_mesh((num_devices,))
-    # print(f"Device Array: \n\n{devices}\n")
+        # start the producer
+        train_producer_process = mp_ctx.Process(target=data_loader, args=(train_queue, train_extractor))
+        train_producer_process.start()
+        val_producer_process = mp_ctx.Process(target=data_loader, args=(val_queue, val_extractor))
+        val_producer_process.start() 
+        # start the consumer
+        consumer_process = mp_ctx.Process(target=update_model, args=(args, cfg, train_queue, val_queue))
+        consumer_process.start()
 
-    # # Create a mesh from the device array
-    # mesh = Mesh(devices, axis_names=("ax"))
+        # wait for all processes to finish
+        train_producer_process.join()
+        val_producer_process.join()
+        consumer_process.join()
+        # Terminate processes if they didn't finish within the timeout
+        if train_producer_process.is_alive():
+            print("Train Producer process didn't finish in time, terminating...")
+            train_producer_process.terminate()
+        if val_producer_process.is_alive():
+            print("Val Producer process didn't finish in time, terminating...")
+            val_producer_process.terminate()     
+        if consumer_process.is_alive():
+            print("Consumer process didn't finish in time, terminating...")
+            consumer_process.terminate()
 
-    # # Define sharding with a partiton spec
-    # sharding = NamedSharding(mesh, P("ax"))
-
-    # print(f"Number of logical devices: {len(devices)}")
-    # print(f"Shape of device array    : {devices.shape}")
-    # print(f"\nMesh     : {mesh}")
-    # print(f"Sharding : {sharding}\n\n")
-
-    # with open(metrics_path,"a") as f:
-    #     #TODO: Fix Frame extractor rng
-    #     with frame_extractor.FrameExtractor(video_paths_train, batch_size, state[2]) as train_fe:
-    #         with frame_extractor.FrameExtractor(video_paths_val, batch_size, state[2]) as val_fe:
-    #             for _ in utils.tqdm_inf():
-    #                 # Training iteration
-    #                 train_data = jnp.array(next(train_fe), dtype=jnp.float32)
-    #                 train_data = jax.device_put(train_data, sharding)
-    #                 print(f"Shard shape: {sharding.shard_shape(train_data.shape)}")  
-    #                 train_loss, state = utils.update_state(state, train_data, optimizer, vae_loss)
-
-    #                 # Validation iteration
-    #                 val_data = jnp.array(next(val_fe), dtype=jnp.float32)
-    #                 val_data = jax.device_put(val_data, sharding)
-    #                 val_loss, _ = utils.update_state(state, val_data, optimizer, vae_loss)
-
-    #                 # Print or log training and validation losses
-    #                 #print(f"Training Loss: {train_loss}, Validation Loss: {val_loss}")
-
-    #                 # Save metrics to file
-    #                 f.write(f"{train_loss}\t{val_loss}\n")
-    #                 f.flush()
-    #                 iteration = state[3]
-    #                 if (iteration % ckpt_interval) == (ckpt_interval - 1):
-    #                     ckpt_path = utils.ckpt_path(ckpt_dir, iteration+1, "vae")
-    #                     utils.save_checkpoint(state, ckpt_path)
-    #                     print("---------CHECKPOINT SAVED----------")
-
-    ### FOR DEBUGGING ###
-
-    # # Train data
-    # train_fe = frame_extractor.FrameExtractor(video_paths_train, batch_size, state[2])
-    # train_data = jnp.array(next(train_fe), dtype=jnp.float32)
-
-    # # Shard the data
-    # sharded_data = jax.device_put(train_data, sharding)
-
-    # print(f"Data  shape: {train_data.shape}")
-    # print(f"Shard shape: {sharding.shard_shape(train_data.shape)}")        
+        print("All tasks are done!")
+    except KeyboardInterrupt:
+        print("Main process received KeyboardInterrupt, terminating...")
